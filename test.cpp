@@ -13,10 +13,6 @@
 #include <signal.h>
 #include <sys/times.h>
 
-// #include <sys/stat.h>
-// #include <fnmatch.h>
-// #include <dirent.h>
-
 using namespace std;
 
 void quarter_pipe (vector < vector<char *> > & argv, int n) {
@@ -30,8 +26,8 @@ void quarter_pipe (vector < vector<char *> > & argv, int n) {
                         execvp(argv[i][0], &argv[i][0]);
                         exit(0);
                 } else {
-                    	close(fd[1]);
-                    	dup2(fd[0], 0);
+                        close(fd[1]);
+                        dup2(fd[0], 0);
                 }
         }
         execvp(argv[n-1][0], &argv[n-1][0]);
@@ -51,14 +47,14 @@ int main () {
                 } else {
                         printf("%s> ", path);
                 }
-
-        //-------------------------------убираем_лишние_пробелы_и_табуляцию-----------------------------------
                 string text;
                 getline (cin, text);
+        //--------------------------------------------Ctrl+D------------------------------------------------                
                 if (cin.eof() && (text.size() == 0)) {
                         printf("\n");
                         exit(0);
                 }
+        //-------------------------------убираем_лишние_пробелы_и_табуляцию-----------------------------------
                 while (text[0] == ' ' || text[0] == '\t') {
                         text.erase(0,1);
                 }
@@ -76,7 +72,7 @@ int main () {
                 if (text.size() == 0) {
                         continue;
                 }
-
+        //---------------------------------------флажок_для_пайпа------------------------------------------
                 flag = (text.find("|") == string::npos) ? 0 : 1;
                 int number = count(text.begin(), text.end(), '|') + 1;
 
@@ -99,6 +95,7 @@ int main () {
                 if (flag == 0) {          //------------нет_пайпа-------------
                         vector <string> victor; //necessary vector
                         for (i = 0; i < myvector.size(); i++) {
+                //------------------------------------------метасимволы----------------------------------------------                                
                                 if (myvector[i].find('*') != string::npos || myvector[i].find('?') != string::npos) {
                                         glob_t result;
                                         int glock = glob(myvector[i].c_str(), GLOB_TILDE, NULL, &result);
@@ -128,9 +125,9 @@ int main () {
                                 cout << "exit" << endl;
                                 exit(0);
                         } else if (victor[0] == "cd") {
-                                if (argv[1] != NULL) {          //мб попробовать через flags...но тогда не работает "cd .."
-                                        chdir(argv[1]);		//bash выводит на этом месте суть ошибки,
-                                } else {			//а микроша игнорирует, не выводит
+                                if (argv[1] != NULL) {          //mb try flag...но тогда не работает "cd .."
+                                        chdir(argv[1]);
+                                } else {
                                         chdir(::getenv("HOME"));
                                 }
                         }
@@ -180,8 +177,8 @@ int main () {
                                                                 fprintf(stderr, "real\t%lf\nuser\t%lf\nsys\t%lf\n", 10000 * (double)(wall_end - wall_start) / CLOCKS_PER_SEC, 10000 * (double)(buf_end.tms_cutime - buf_start.tms_cutime) / CLOCKS_PER_SEC, 10000 * (double)(buf_end.tms_cstime - buf_start.tms_cstime) / CLOCKS_PER_SEC);
                                                         }
                                                 }
-                                                wait(NULL); //??????????????????????????
-                                                close(fid); //тут может ругаться (или нет)
+                                                wait(NULL);
+                                                close(fid);
                                         } else {
                                                 fprintf(stderr,"microsha: синтаксическая ошибка рядом с неожиданным маркером «newline» \n");
                                                 return 0;
@@ -268,8 +265,7 @@ int main () {
                                 }
                         }
                         wait(NULL);
-                } else {		//------------есть_пайп-------------
-//                        vector <string> victor;
+                } else {
                         vector < vector <char *> > argv(number);
                         int j = 0;
                         for (i = 0; i < myvector.size(); i++) {
@@ -277,23 +273,21 @@ int main () {
                                         argv[j].push_back(NULL);
                                         j++;
                                 } else if (myvector[i].find('*') != string::npos || myvector[i].find('?') != string::npos) {
+                         //------------------------------------------метасимволы----------------------------------------------     
                                         glob_t result;
                                         int glock = glob(myvector[i].c_str(), GLOB_TILDE, NULL, &result);
                                         if (glock != 0) {
                                                 globfree(&result);
                                                 perror("microsha: metasymbol function failed");
                                         }
-                                        vector <string> files;
                                         for (size_t k = 0; k < result.gl_pathc; k++) {
-                                                files.push_back(string(result.gl_pathv[k]));
+                                                char *buf = (char *)malloc((2 + strlen(result.gl_pathv[k])) * sizeof(char));
+                                                strcpy(buf, result.gl_pathv[k]);
+                                                argv[j].push_back(buf);
                                         }
                                         globfree(&result);
-                                        for (int m = 0; m < files.size(); m++) {
-//                                                victor.push_back(files[m]);
-                                                argv[j].push_back((char *)files[m].c_str());
-                                        }
+
                                 } else {
-//                                        victor.push_back(myvector[i]);
                                         argv[j].push_back((char *)myvector[i].c_str());
                                 }
                         }
