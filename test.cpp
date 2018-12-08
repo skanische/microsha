@@ -13,6 +13,10 @@
 #include <signal.h>
 #include <sys/times.h>
 
+//#include <sys/stat.h>
+//#include <fnmatch.h>
+//#include <dirent.h>
+
 using namespace std;
 
 void quarter_pipe (vector < vector<char *> > & argv, int n) {
@@ -39,6 +43,7 @@ int main () {
         uid_t uid=getuid();
         for(;;) {
                 int flag;
+                int perep = 0;
                 char dir[1000];
                 char *path;
                 path = getcwd(dir, 1000);
@@ -47,14 +52,14 @@ int main () {
                 } else {
                         printf("%s> ", path);
                 }
+
+        //-------------------------------убираем_лишние_пробелы_и_табуляцию-----------------------------------
                 string text;
                 getline (cin, text);
-        //--------------------------------------------Ctrl+D------------------------------------------------                
                 if (cin.eof() && (text.size() == 0)) {
                         printf("\n");
                         exit(0);
                 }
-        //-------------------------------убираем_лишние_пробелы_и_табуляцию-----------------------------------
                 while (text[0] == ' ' || text[0] == '\t') {
                         text.erase(0,1);
                 }
@@ -72,7 +77,7 @@ int main () {
                 if (text.size() == 0) {
                         continue;
                 }
-        //---------------------------------------флажок_для_пайпа------------------------------------------
+
                 flag = (text.find("|") == string::npos) ? 0 : 1;
                 int number = count(text.begin(), text.end(), '|') + 1;
 
@@ -95,7 +100,6 @@ int main () {
                 if (flag == 0) {          //------------нет_пайпа-------------
                         vector <string> victor; //necessary vector
                         for (i = 0; i < myvector.size(); i++) {
-                //------------------------------------------метасимволы----------------------------------------------                                
                                 if (myvector[i].find('*') != string::npos || myvector[i].find('?') != string::npos) {
                                         glob_t result;
                                         int glock = glob(myvector[i].c_str(), GLOB_TILDE, NULL, &result);
@@ -134,6 +138,7 @@ int main () {
                         for (i = 0; i < victor.size(); i++) {
                 //--------------------------------------перенаправление_вывода---------------------------------------
                                 if (victor[i] == ">") {
+                                        perep++;
                                         if (i != victor.size() - 1) {
                                                 i++;
                                                 string file = victor[i];
@@ -144,25 +149,27 @@ int main () {
                                                         }
                                                 }
                                                 commands.push_back(NULL);
-                                                int fid = open((char *)file.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666);
-                                                if (fid == -1) {
-                                                        perror("open");
-                                                        return 0;
-                                                }
-
-                                                dup2(fid,1);
                                                 pid_t pid = fork();
                                                 if (pid == 0) {
                                                         signal(SIGINT, SIG_DFL);
+                                                        int fid = open((char *)file.c_str(), O_RDWR | O_CREAT | O_TRUNC, 0666);
+                                                        dup2(fid,1);
+                                                        if (fid == -1) {
+                                                                perror("open");
+                                                                return 0;
+                                                        }
                                                         if (victor[0] == "cd") {
                                                         } else if (victor[0] == "time") {
                                                                 execvp(commands[1], &commands[1]);
                                                                 fprintf(stderr, "microsha: %s: команда не найдена\n", commands[0]);
+                                                                exit(0);
                                                         } else {
                                                                 execvp(commands[0], &commands[0]);
                                                                 fprintf(stderr, "microsha: %s: команда не найдена\n", commands[0]);
+                                                                exit(0);
                                                         }
-                                                        exit(0);
+                                                        wait(NULL);
+                                                        close(fid);
                                                 } else {
                                                         tms buf_start;
                                                         tms buf_end;
@@ -177,16 +184,15 @@ int main () {
                                                                 fprintf(stderr, "real\t%lf\nuser\t%lf\nsys\t%lf\n", 10000 * (double)(wall_end - wall_start) / CLOCKS_PER_SEC, 10000 * (double)(buf_end.tms_cutime - buf_start.tms_cutime) / CLOCKS_PER_SEC, 10000 * (double)(buf_end.tms_cstime - buf_start.tms_cstime) / CLOCKS_PER_SEC);
                                                         }
                                                 }
-                                                wait(NULL);
-                                                close(fid);
                                         } else {
                                                 fprintf(stderr,"microsha: синтаксическая ошибка рядом с неожиданным маркером «newline» \n");
-                                                return 0;
+                                                continue;
                                         }
                                 }
                 //--------------------------------------перенаправление_ввода---------------------------------------
 
                                 else if (victor[i] == "<") {
+                                        perep++;
                                         if (i != victor.size() - 1) {
                                                 i++;
                                                 string file = victor[i];
@@ -197,25 +203,27 @@ int main () {
                                                         }
                                                 }
                                                 commands.push_back(NULL);
-                                                int fid = open((char *)file.c_str(), O_RDWR, 0600);
-                                                if (fid == -1) {
-                                                        fprintf(stderr, "microsha: %s: Нет такого файла или каталога\n", (char *)file.c_str());
-                                                        return 0;
-                                                }
-
-                                                dup2(fid,0);
                                                 pid_t pid = fork();
                                                 if (pid == 0) {
                                                         signal(SIGINT, SIG_DFL);
+                                                        int fid = open((char *)file.c_str(), O_RDWR, 0600);
+                                                        dup2(fid,0);
+                                                        if (fid == -1) {
+                                                                fprintf(stderr, "microsha: %s: Нет такого файла или каталога\n", (char *)file.c_str());
+                                                                return 0;
+                                                        }
                                                         if (victor[0] == "cd") {
                                                         } else if (victor[0] == "time") {
                                                                 execvp(commands[1], &commands[1]);
                                                                 fprintf(stderr, "microsha: %s: команда не найдена\n", commands[0]);
+                                                                exit(0);
                                                         } else {
                                                                 execvp(commands[0], &commands[0]);
                                                                 fprintf(stderr, "microsha: %s: команда не найдена\n", commands[0]);
+                                                                exit(0);
                                                         }
-                                                        exit(0);
+                                                        wait(NULL);
+                                                        close(fid);
                                                 } else {
                                                         tms buf_start;
                                                         tms buf_end;
@@ -230,14 +238,13 @@ int main () {
                                                                 fprintf(stderr, "real\t%lf\nuser\t%lf\nsys\t%lf\n", 10000 * (double)(wall_end - wall_start) / CLOCKS_PER_SEC, 10000 * (double)(buf_end.tms_cutime - buf_start.tms_cutime) / CLOCKS_PER_SEC, 10000 * (double)(buf_end.tms_cstime - buf_start.tms_cstime) / CLOCKS_PER_SEC);
                                                         }
                                                 }
-                                                wait(NULL);
-                                                close(fid);
                                         } else {
                                                 fprintf(stderr,"microsha: синтаксическая ошибка рядом с неожиданным маркером «newline» \n");
-                                                return 0;
+                                                continue;
                                         }
                                 }
                         }
+                        if (perep != 0) continue;
                         pid_t pid = fork();
                         if (pid == 0) {
                                 signal(SIGINT, SIG_DFL);
@@ -273,7 +280,6 @@ int main () {
                                         argv[j].push_back(NULL);
                                         j++;
                                 } else if (myvector[i].find('*') != string::npos || myvector[i].find('?') != string::npos) {
-                         //------------------------------------------метасимволы----------------------------------------------     
                                         glob_t result;
                                         int glock = glob(myvector[i].c_str(), GLOB_TILDE, NULL, &result);
                                         if (glock != 0) {
